@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import archiver from 'archiver';
 import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,7 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // --- Redis Database for Points and Locks ---
@@ -86,6 +87,24 @@ async function saveUser(email: string, name: string, points: number) {
     }
   }
   usersDbMem.set(email, { email, name, points });
+}
+
+async function addPoints(email: string, pointsToAdd: number) {
+  if (redis) {
+    try {
+      const newPoints = await redis.hincrby(`user:${email}`, 'points', pointsToAdd);
+      return newPoints;
+    } catch (err) {
+      console.error('Redis addPoints error:', err);
+    }
+  }
+  const user = usersDbMem.get(email);
+  if (user) {
+    user.points += pointsToAdd;
+    usersDbMem.set(email, user);
+    return user.points;
+  }
+  return 0;
 }
 
 async function ensureUser(email: string, name: string) {
@@ -788,6 +807,266 @@ app.post('/api/admin/folders', isAdmin, async (req, res) => {
 });
 
 // --------------------------------
+
+// --- Topup Endpoints ---
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+async function getUserEmailFromReq(req: express.Request): Promise<string | null> {
+  const accessToken = req.cookies.google_access_token;
+  if (!accessToken) return null;
+  try {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    return userInfo.data.email || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const topupOrdersMem = new Map<string, any>();
+const rateLimitMem = new Map<string, number>();
+
+async function checkRateLimit(key: string): Promise<boolean> {
+  if (redis) {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, 86400);
+    return count <= 5;
+  } else {
+    const count = (rateLimitMem.get(key) || 0) + 1;
+    rateLimitMem.set(key, count);
+    return count <= 5;
+  }
+}
+
+app.post('/api/topup/create', async (req, res) => {
+  const email = await getUserEmailFromReq(req);
+  if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { credits } = req.body;
+  if (!credits || credits < 10 || credits % 10 !== 0) {
+    return res.status(400).json({ error: 'Invalid credits amount. Must be multiple of 10.' });
+  }
+
+  const amountRM = credits / 10;
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const today = new Date().toISOString().split('T')[0];
+  
+  const canCreateEmail = await checkRateLimit(`ratelimit:topup:${email}:${today}`);
+  const canCreateIp = await checkRateLimit(`ratelimit:topup:${ip}:${today}`);
+  
+  if (!canCreateEmail || !canCreateIp) {
+    return res.status(429).json({ error: 'Daily order limit reached (5 orders/day).' });
+  }
+
+  const orderId = `TNG-${new Date().toISOString().replace(/[-T:Z.]/g, '').slice(0, 14)}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  
+  const order = {
+    orderId,
+    email,
+    credits,
+    amountRM,
+    status: 'pending',
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  };
+
+  if (redis) {
+    await redis.set(`order:${orderId}`, JSON.stringify(order), 'EX', 86400);
+    await redis.set(`current_order:${email}`, orderId, 'EX', 600);
+  } else {
+    topupOrdersMem.set(orderId, order);
+    topupOrdersMem.set(`current_order:${email}`, orderId);
+  }
+
+  res.json({ success: true, order });
+});
+
+app.get('/api/topup/current', async (req, res) => {
+  const email = await getUserEmailFromReq(req);
+  if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+  let orderId = null;
+  if (redis) {
+    orderId = await redis.get(`current_order:${email}`);
+  } else {
+    orderId = topupOrdersMem.get(`current_order:${email}`);
+  }
+
+  if (!orderId) return res.json({ order: null });
+
+  let order = null;
+  if (redis) {
+    const data = await redis.get(`order:${orderId}`);
+    if (data) order = JSON.parse(data);
+  } else {
+    order = topupOrdersMem.get(orderId);
+  }
+
+  if (!order || order.status !== 'pending' || order.expiresAt < Date.now()) {
+    return res.json({ order: null });
+  }
+
+  res.json({ order });
+});
+
+app.post('/api/topup/upload', async (req, res) => {
+  const email = await getUserEmailFromReq(req);
+  if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { orderId, imageBase64 } = req.body;
+  if (!orderId || !imageBase64) return res.status(400).json({ error: 'Missing orderId or image' });
+
+  let order = null;
+  if (redis) {
+    const data = await redis.get(`order:${orderId}`);
+    if (data) order = JSON.parse(data);
+  } else {
+    order = topupOrdersMem.get(orderId);
+  }
+
+  if (!order || order.email !== email) return res.status(404).json({ error: 'Order not found' });
+  if (order.status !== 'pending') return res.status(400).json({ error: 'Order is not pending' });
+  if (order.expiresAt < Date.now()) return res.status(400).json({ error: 'Order has expired' });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: imageBase64.split(',')[1] || imageBase64
+            }
+          },
+          {
+            text: `Extract the following information from this Touch 'n Go eWallet transfer screenshot.
+            Return ONLY a JSON object with these exact keys:
+            - amount: (number, the transfer amount in RM)
+            - transactionId: (string, the Reference ID or Transaction ID)
+            - remarks: (string, the notes or remarks entered by the user)
+            - time: (string, the date and time of the transaction)
+            - isEdited: (boolean, true if the image looks photoshopped, manipulated, or fake)
+            
+            If you cannot find a value, use null.`
+          }
+        ]
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            amount: { type: Type.NUMBER },
+            transactionId: { type: Type.STRING },
+            remarks: { type: Type.STRING },
+            time: { type: Type.STRING },
+            isEdited: { type: Type.BOOLEAN }
+          },
+          required: ['amount', 'transactionId', 'remarks', 'time', 'isEdited']
+        }
+      }
+    });
+
+    const extracted = JSON.parse(response.text || '{}');
+    
+    const isAmountMatch = extracted.amount === order.amountRM;
+    const isRemarkMatch = extracted.remarks && extracted.remarks.includes(order.orderId);
+    
+    let isTxUnique = true;
+    if (extracted.transactionId) {
+      if (redis) {
+        const exists = await redis.setnx(`tx:${extracted.transactionId}`, orderId);
+        isTxUnique = exists === 1;
+      } else {
+        if (topupOrdersMem.has(`tx:${extracted.transactionId}`)) {
+          isTxUnique = false;
+        } else {
+          topupOrdersMem.set(`tx:${extracted.transactionId}`, orderId);
+        }
+      }
+    } else {
+      isTxUnique = false;
+    }
+
+    if (!isAmountMatch || !isRemarkMatch || !isTxUnique || extracted.isEdited) {
+      order.aiExtractedInfo = extracted;
+      order.status = 'failed';
+      if (redis) {
+        await redis.set(`order:${orderId}`, JSON.stringify(order), 'EX', 86400);
+      } else {
+        topupOrdersMem.set(orderId, order);
+      }
+      
+      return res.status(400).json({ 
+        error: 'Recognition failed, please ensure screenshot is clear or retry.',
+        details: {
+          amountMatch: isAmountMatch,
+          remarkMatch: isRemarkMatch,
+          txUnique: isTxUnique,
+          isEdited: extracted.isEdited
+        }
+      });
+    }
+
+    let newPoints = 0;
+    const userRecord = await getUser(email);
+    if (userRecord) {
+      newPoints = await addPoints(email, order.credits);
+    }
+
+    order.status = 'completed';
+    order.transactionId = extracted.transactionId;
+    order.aiExtractedInfo = extracted;
+    
+    if (redis) {
+      await redis.set(`order:${orderId}`, JSON.stringify(order), 'EX', 86400);
+      await redis.del(`current_order:${email}`);
+    } else {
+      topupOrdersMem.set(orderId, order);
+      topupOrdersMem.delete(`current_order:${email}`);
+    }
+
+    res.json({ success: true, order, newPoints });
+
+  } catch (error: any) {
+    console.error('AI Processing error:', error);
+    res.status(500).json({ error: 'Failed to process image. Please try again.' });
+  }
+});
+
+app.post('/api/topup/appeal', async (req, res) => {
+  const email = await getUserEmailFromReq(req);
+  if (!email) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { orderId, phone } = req.body;
+  if (!orderId || !phone) return res.status(400).json({ error: 'Missing orderId or phone' });
+
+  let order = null;
+  if (redis) {
+    const data = await redis.get(`order:${orderId}`);
+    if (data) order = JSON.parse(data);
+  } else {
+    order = topupOrdersMem.get(orderId);
+  }
+
+  if (!order || order.email !== email) return res.status(404).json({ error: 'Order not found' });
+  
+  order.status = 'appealed';
+  order.appealPhone = phone;
+
+  if (redis) {
+    await redis.set(`order:${orderId}`, JSON.stringify(order), 'EX', 86400);
+    await redis.del(`current_order:${email}`);
+  } else {
+    topupOrdersMem.set(orderId, order);
+    topupOrdersMem.delete(`current_order:${email}`);
+  }
+
+  res.json({ success: true });
+});
 
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
