@@ -7,6 +7,7 @@ import archiver from 'archiver';
 import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
 import { GoogleGenAI, Type } from '@google/genai';
+import axios from 'axios';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -927,50 +928,58 @@ app.post('/api/topup/upload', async (req, res) => {
   }
 
   if (!order || order.email !== email) return res.status(404).json({ error: 'Order not found' });
-  if (order.status !== 'pending') return res.status(400).json({ error: 'Order is not pending' });
+  if (order.status !== 'pending' && order.status !== 'failed') return res.status(400).json({ error: 'Order cannot be processed' });
   if (order.expiresAt < Date.now()) return res.status(400).json({ error: 'Order has expired' });
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: imageBase64.split(',')[1] || imageBase64
-            }
-          },
-          {
-            text: `Extract the following information from this Touch 'n Go eWallet transfer screenshot.
-            Return ONLY a JSON object with these exact keys:
-            - amount: (number, the transfer amount in RM)
-            - transactionId: (string, the Reference ID or Transaction ID)
-            - remarks: (string, the notes or remarks entered by the user)
-            - time: (string, the date and time of the transaction)
-            - isEdited: (boolean, true if the image looks photoshopped, manipulated, or fake)
-            
-            If you cannot find a value, use null.`
-          }
-        ]
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            amount: { type: Type.NUMBER },
-            transactionId: { type: Type.STRING },
-            remarks: { type: Type.STRING },
-            time: { type: Type.STRING },
-            isEdited: { type: Type.BOOLEAN }
-          },
-          required: ['amount', 'transactionId', 'remarks', 'time', 'isEdited']
-        }
-      }
-    });
+    order.screenshot = imageBase64; // Save screenshot to database
 
-    const extracted = JSON.parse(response.text || '{}');
+    const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
+    const headers = {
+      "Authorization": `Bearer ${process.env.NVIDIA_API_KEY || "nvxxxxxRKDMoJ4"}`,
+      "Accept": "application/json"
+    };
+
+    const payload = {
+      "model": "qwen/qwen3.5-397b-a17b",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": `Extract the following information from this Touch 'n Go eWallet transfer screenshot.
+              Return ONLY a JSON object with these exact keys:
+              - amount: (number, the transfer amount in RM)
+              - transactionId: (string, the Reference ID or Transaction ID)
+              - remarks: (string, the notes or remarks entered by the user)
+              - time: (string, the date and time of the transaction)
+              - isEdited: (boolean, true if the image looks photoshopped, manipulated, or fake)
+              
+              If you cannot find a value, use null.`
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ],
+      "max_tokens": 16384,
+      "temperature": 0.60,
+      "top_p": 0.95,
+      "top_k": 20,
+      "presence_penalty": 0,
+      "repetition_penalty": 1,
+      "stream": false,
+      "chat_template_kwargs": {"enable_thinking":true}
+    };
+
+    const response = await axios.post(invokeUrl, payload, { headers });
+    const content = response.data.choices[0].message.content;
+    const extracted = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim() || '{}');
     
     const isAmountMatch = extracted.amount === order.amountRM;
     const isRemarkMatch = extracted.remarks && extracted.remarks.includes(order.orderId);
@@ -978,10 +987,15 @@ app.post('/api/topup/upload', async (req, res) => {
     let isTxUnique = true;
     if (extracted.transactionId) {
       if (redis) {
-        const exists = await redis.setnx(`tx:${extracted.transactionId}`, orderId);
-        isTxUnique = exists === 1;
+        const existingOrderId = await redis.get(`tx:${extracted.transactionId}`);
+        if (existingOrderId && existingOrderId !== orderId) {
+          isTxUnique = false;
+        } else {
+          await redis.set(`tx:${extracted.transactionId}`, orderId, 'EX', 86400 * 30);
+        }
       } else {
-        if (topupOrdersMem.has(`tx:${extracted.transactionId}`)) {
+        const existingOrderId = topupOrdersMem.get(`tx:${extracted.transactionId}`);
+        if (existingOrderId && existingOrderId !== orderId) {
           isTxUnique = false;
         } else {
           topupOrdersMem.set(`tx:${extracted.transactionId}`, orderId);
@@ -1033,6 +1047,15 @@ app.post('/api/topup/upload', async (req, res) => {
 
   } catch (error: any) {
     console.error('AI Processing error:', error);
+    
+    // Save the order with the screenshot even if AI fails
+    order.status = 'failed';
+    if (redis) {
+      await redis.set(`order:${orderId}`, JSON.stringify(order), 'EX', 86400);
+    } else {
+      topupOrdersMem.set(orderId, order);
+    }
+    
     res.status(500).json({ error: 'Failed to process image. Please try again.' });
   }
 });
