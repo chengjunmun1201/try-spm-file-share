@@ -15,7 +15,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import TopupPanel from './components/TopupPanel';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -433,7 +432,6 @@ export default function App() {
   const [user, setUser] = useState<UserInfo | null>(null);
 
   const [currentView, setCurrentView] = useState<'explorer' | 'admin'>('explorer');
-  const [showTopup, setShowTopup] = useState(false);
   const [unlockingFolder, setUnlockingFolder] = useState<DriveFile | null>(null);
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
@@ -454,8 +452,6 @@ export default function App() {
   };
 
   const currentFolderId = path[path.length - 1].id;
-
-  const [background, setBackground] = useState('/backgrounds/abstract-block-color-wavy-lines-orange-and-blue-25-09-2024-1727333608-hd-wallpaper (3).jpeg');
 
   useEffect(() => {
     checkAuthStatus();
@@ -849,7 +845,7 @@ export default function App() {
   };
 
   return (
-    <div ref={containerRef} className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans" style={{ backgroundImage: `url(${background})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div ref={containerRef} className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans">
       <div className="bg-fluid"></div>
       
       {/* Main Content */}
@@ -874,12 +870,12 @@ export default function App() {
             {/* Mobile Sign In */}
             <div className="lg:hidden shrink-0 ml-4">
               {isLoggedIn && user ? (
-                <div className="glass-pill px-1.5 py-1.5 flex items-center gap-2 pr-2 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setShowTopup(true)}>
+                <div className="glass-pill px-1.5 py-1.5 flex items-center gap-2 pr-2">
                   <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border border-white/30" referrerPolicy="no-referrer" />
                   <div className="flex flex-col">
                     <span className="text-[10px] font-medium text-white/90">{user.points} PTS</span>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                  <button onClick={handleLogout} className="p-1 hover:bg-white/20 rounded-full transition-colors">
                     <X size={12} />
                   </button>
                 </div>
@@ -911,7 +907,7 @@ export default function App() {
                 </button>
               )}
               <div className="w-px h-6 bg-white/20 mx-1"></div>
-              <button onClick={() => setShowTopup(true)} className="px-3 sm:px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
+              <button className="px-3 sm:px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
                 <Plus size={16} /> <span className="hidden sm:block">Credits</span>
               </button>
               <button className="px-3 sm:px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
@@ -923,13 +919,13 @@ export default function App() {
           {/* Right: User Info (Desktop) */}
           <div className="hidden lg:flex items-center justify-end lg:w-1/3 pointer-events-auto">
             {isLoggedIn && user ? (
-              <div className="glass-pill px-2 py-1.5 flex items-center gap-3 pr-4 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setShowTopup(true)}>
+              <div className="glass-pill px-2 py-1.5 flex items-center gap-3 pr-4">
                 <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border border-white/30" referrerPolicy="no-referrer" />
                 <div className="flex flex-col">
                   <span className="text-sm font-medium leading-tight">{user.name.split(' ')[0]}</span>
                   <span className="text-[10px] text-white/70">{user.points} PTS</span>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors">
+                <button onClick={handleLogout} className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors">
                   <X size={14} />
                 </button>
               </div>
@@ -1363,18 +1359,6 @@ export default function App() {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showTopup && (
-          <TopupPanel 
-            onClose={() => setShowTopup(false)} 
-            onSuccess={(newPoints) => {
-              if (user) setUser({ ...user, points: newPoints });
-              setShowTopup(false);
-            }} 
-          />
         )}
       </AnimatePresence>
     </div>
