@@ -455,11 +455,31 @@ export default function App() {
 
   useEffect(() => {
     checkAuthStatus();
-    // Initial "half closed" state
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.clientHeight * 0.35;
-    }
   }, []);
+
+  useEffect(() => {
+    if (currentView === 'explorer' && scrollRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          const clientHeight = scrollRef.current.clientHeight;
+          const isDesktop = window.innerWidth >= 1024;
+          const headerHeight = isDesktop ? 100 : 160;
+          // We want the file list to occupy 70% of the space below the header.
+          // This means the top of the file list should be at 30% of the space below the header.
+          // File list position = 0.85 * clientHeight - scrollTop
+          // Target position = headerHeight + 0.3 * (clientHeight - headerHeight)
+          // scrollTop = 0.85 * clientHeight - (headerHeight + 0.3 * clientHeight - 0.3 * headerHeight)
+          // scrollTop = 0.55 * clientHeight - 0.7 * headerHeight
+          const targetScrollTop = 0.55 * clientHeight - 0.7 * headerHeight;
+          scrollRef.current.scrollTop = targetScrollTop;
+          
+          const maxScroll = clientHeight * 0.85 - headerHeight;
+          const progress = Math.min(Math.max(targetScrollTop / maxScroll, 0), 1);
+          setScrollProgress(progress);
+        }
+      });
+    }
+  }, [currentView]);
 
   useEffect(() => {
     const container = containerRef.current;
