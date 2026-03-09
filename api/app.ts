@@ -980,7 +980,25 @@ app.post('/api/topup/upload', async (req, res) => {
 
     const response = await axios.post(invokeUrl, payload, { headers });
     const content = response.data.choices[0].message.content;
-    const extracted = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim() || '{}');
+    
+    // Robustly extract JSON from the response content
+    let extracted = {};
+    try {
+      // Find the first '{' and the last '}'
+      const startIndex = content.indexOf('{');
+      const endIndex = content.lastIndexOf('}');
+      
+      if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+        const jsonString = content.substring(startIndex, endIndex + 1);
+        extracted = JSON.parse(jsonString);
+      } else {
+        // Fallback to the original regex replacement if no braces found
+        extracted = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim() || '{}');
+      }
+    } catch (e) {
+      console.error('Failed to parse JSON from AI response:', content);
+      throw new Error('Invalid JSON response from AI');
+    }
     
     const isAmountMatch = extracted.amount === order.amountRM;
     const isRemarkMatch = extracted.remarks && extracted.remarks.includes(order.orderId);
