@@ -868,20 +868,19 @@ export default function App() {
             </div>
             
             {/* Mobile Sign In */}
-            <div className="lg:hidden">
+            <div className="lg:hidden shrink-0 ml-4">
               {isLoggedIn && user ? (
-                <div className="glass-pill px-2 py-1.5 flex items-center gap-3 pr-4">
-                  <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border border-white/30" referrerPolicy="no-referrer" />
+                <div className="glass-pill px-1.5 py-1.5 flex items-center gap-2 pr-2">
+                  <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full border border-white/30" referrerPolicy="no-referrer" />
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium leading-tight">{user.name}</span>
-                    <span className="text-[10px] text-white/70">{user.points} PTS</span>
+                    <span className="text-[10px] font-medium text-white/90">{user.points} PTS</span>
                   </div>
-                  <button onClick={handleLogout} className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors">
-                    <X size={14} />
+                  <button onClick={handleLogout} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                    <X size={12} />
                   </button>
                 </div>
               ) : (
-                <button onClick={handleLogin} className="glass-pill px-6 py-2 text-sm font-medium hover:bg-white/20 transition-colors">
+                <button onClick={handleLogin} className="glass-pill px-4 py-1.5 text-xs font-medium hover:bg-white/20 transition-colors">
                   Sign In
                 </button>
               )}
@@ -893,24 +892,26 @@ export default function App() {
             <div className="glass-pill p-1 flex items-center gap-1 flex-wrap justify-center">
               <button 
                 onClick={() => setCurrentView('explorer')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${currentView === 'explorer' ? 'bg-white text-slate-900 shadow-sm' : 'text-white hover:bg-white/10'}`}
+                className={`px-3 sm:px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${currentView === 'explorer' ? 'bg-white text-slate-900 shadow-sm' : 'text-white hover:bg-white/10'}`}
               >
-                Archive
+                <Folder size={16} />
+                <span className={`${currentView === 'explorer' ? 'block' : 'hidden'} sm:block`}>Archive</span>
               </button>
               {user?.isAdmin && (
                 <button 
                   onClick={() => setCurrentView('admin')} 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${currentView === 'admin' ? 'bg-white text-slate-900 shadow-sm' : 'text-white hover:bg-white/10'}`}
+                  className={`px-3 sm:px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${currentView === 'admin' ? 'bg-white text-slate-900 shadow-sm' : 'text-white hover:bg-white/10'}`}
                 >
-                  Admin Panel
+                  <Settings size={16} />
+                  <span className={`${currentView === 'admin' ? 'block' : 'hidden'} sm:block`}>Admin Panel</span>
                 </button>
               )}
               <div className="w-px h-6 bg-white/20 mx-1"></div>
-              <button className="px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
-                <Plus size={14} /> <span className="hidden sm:inline">Credits</span>
+              <button className="px-3 sm:px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
+                <Plus size={16} /> <span className="hidden sm:block">Credits</span>
               </button>
-              <button className="px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
-                <Upload size={14} /> <span className="hidden sm:inline">Upload</span>
+              <button className="px-3 sm:px-4 py-2 rounded-full text-sm font-medium text-white hover:bg-white/10 transition-all flex items-center gap-2">
+                <Upload size={16} /> <span className="hidden sm:block">Upload</span>
               </button>
             </div>
           </div>
@@ -921,7 +922,7 @@ export default function App() {
               <div className="glass-pill px-2 py-1.5 flex items-center gap-3 pr-4">
                 <img src={user.picture} alt={user.name} className="w-9 h-9 rounded-full border border-white/30" referrerPolicy="no-referrer" />
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium leading-tight">{user.name}</span>
+                  <span className="text-sm font-medium leading-tight">{user.name.split(' ')[0]}</span>
                   <span className="text-[10px] text-white/70">{user.points} PTS</span>
                 </div>
                 <button onClick={handleLogout} className="ml-2 p-1.5 hover:bg-white/20 rounded-full transition-colors">
@@ -1115,7 +1116,7 @@ export default function App() {
                     </div>
 
                     {/* Header Row */}
-                    <div className="grid grid-cols-[40px_1fr_80px_60px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center pb-3 mb-2 font-mono text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-100 px-4">
+                    <div className="grid grid-cols-[32px_1fr_40px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center pb-3 mb-2 font-mono text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-100 px-2 sm:px-4">
                       <div className="flex items-center">
                         <input
                           type="checkbox"
@@ -1132,7 +1133,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto px-2">
+                  <div className="flex-1 overflow-y-auto px-1 sm:px-2">
                     <AnimatePresence mode="popLayout">
                       {files.map((file, i) => {
                         const isFolder = file.mimeType === 'application/vnd.google-apps.folder';
@@ -1144,7 +1145,7 @@ export default function App() {
                             exit={{ opacity: 0, scale: 0.98 }}
                             transition={{ delay: Math.min(i * 0.02, 0.2), duration: 0.3 }}
                             onClick={() => handleRowClick(file)}
-                            className={`group grid grid-cols-[40px_1fr_80px_60px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center py-2 sm:py-3 cursor-pointer rounded-2xl px-2 transition-all hover:bg-slate-50 ${selectedFiles.has(file.id) ? 'bg-slate-50 shadow-sm border border-slate-100' : 'border border-transparent'}`}
+                            className={`group grid grid-cols-[32px_1fr_40px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center py-2 sm:py-3 cursor-pointer rounded-2xl px-2 transition-all hover:bg-slate-50 ${selectedFiles.has(file.id) ? 'bg-slate-50 shadow-sm border border-slate-100' : 'border border-transparent'}`}
                           >
                             <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                               <input
@@ -1158,15 +1159,17 @@ export default function App() {
                               {getFileIcon(file.mimeType)}
                             </div>
                             
-                            <div className="font-display text-sm sm:text-base font-medium line-clamp-1 break-words pr-2 transition-all duration-300 flex items-center gap-2 text-slate-700 group-hover:text-slate-900">
-                              <span className="sm:hidden text-slate-400 mr-1">{getFileIcon(file.mimeType)}</span>
-                              <span className="truncate">{file.name}</span>
-                              {file.isLocked && (
-                                <span className={`shrink-0 flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border ${file.unlocked ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-amber-200 text-amber-600 bg-amber-50'}`}>
-                                  {file.unlocked ? <Unlock size={10} /> : <Lock size={10} />}
-                                  {file.unlocked ? 'Unlocked' : `${file.cost} PTS`}
-                                </span>
-                              )}
+                            <div className="font-display text-sm sm:text-base font-medium pr-2 transition-all duration-300 text-slate-700 group-hover:text-slate-900 flex items-start sm:items-center gap-2">
+                              <span className="sm:hidden text-slate-400 shrink-0 mt-0.5">{getFileIcon(file.mimeType)}</span>
+                              <div className="flex-1 min-w-0">
+                                <span className="line-clamp-2 break-words leading-tight">{file.name}</span>
+                                {file.isLocked && (
+                                  <span className={`mt-1 shrink-0 inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border ${file.unlocked ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-amber-200 text-amber-600 bg-amber-50'}`}>
+                                    {file.unlocked ? <Unlock size={10} /> : <Lock size={10} />}
+                                    {file.unlocked ? 'Unlocked' : `${file.cost} PTS`}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             
                             <div className="hidden sm:block font-mono text-[11px] text-slate-400">
