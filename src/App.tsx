@@ -453,6 +453,8 @@ export default function App() {
 
   const currentFolderId = path[path.length - 1].id;
 
+  const [background, setBackground] = useState('/backgrounds/abstract-block-color-wavy-lines-orange-and-blue-25-09-2024-1727333608-hd-wallpaper (3).jpeg');
+
   useEffect(() => {
     checkAuthStatus();
   }, []);
@@ -845,7 +847,7 @@ export default function App() {
   };
 
   return (
-    <div ref={containerRef} className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans">
+    <div ref={containerRef} className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans" style={{ backgroundImage: `url(${background})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <div className="bg-fluid"></div>
       
       {/* Main Content */}
