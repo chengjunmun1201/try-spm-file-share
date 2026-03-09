@@ -427,6 +427,8 @@ export default function App() {
   const [unlocking, setUnlocking] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overviewRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0.5);
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
@@ -447,6 +449,77 @@ export default function App() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.clientHeight * 0.35;
     }
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const scrollEl = scrollRef.current;
+      const overviewEl = overviewRef.current;
+      if (!scrollEl || !overviewEl) return;
+
+      const isOverOverview = overviewEl.contains(e.target as Node);
+      if (!isOverOverview) return;
+
+      const isFileListFullyDown = scrollEl.scrollTop <= 0;
+      const isOverviewAtBottom = Math.abs(overviewEl.scrollHeight - overviewEl.scrollTop - overviewEl.clientHeight) <= 2;
+
+      if (!isFileListFullyDown) {
+        e.preventDefault();
+        scrollEl.scrollTop += e.deltaY;
+      } else {
+        if (e.deltaY > 0 && isOverviewAtBottom) {
+          e.preventDefault();
+          scrollEl.scrollTop += e.deltaY;
+        }
+      }
+    };
+
+    let touchStartY = 0;
+    let touchLastY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY;
+      touchLastY = touchStartY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const scrollEl = scrollRef.current;
+      const overviewEl = overviewRef.current;
+      if (!scrollEl || !overviewEl) return;
+
+      const isOverOverview = overviewEl.contains(e.target as Node);
+      if (!isOverOverview) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchLastY - currentY;
+      touchLastY = currentY;
+
+      const isFileListFullyDown = scrollEl.scrollTop <= 0;
+      const isOverviewAtBottom = Math.abs(overviewEl.scrollHeight - overviewEl.scrollTop - overviewEl.clientHeight) <= 2;
+
+      if (!isFileListFullyDown) {
+        e.preventDefault();
+        scrollEl.scrollTop += deltaY;
+      } else {
+        if (deltaY > 0 && isOverviewAtBottom) {
+          e.preventDefault();
+          scrollEl.scrollTop += deltaY;
+        }
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+    };
   }, []);
 
   const checkAuthStatus = async () => {
@@ -742,7 +815,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans">
+    <div ref={containerRef} className="h-[100dvh] w-full overflow-hidden flex text-white relative font-sans">
       <div className="bg-fluid"></div>
       
       {/* Main Content */}
@@ -841,7 +914,8 @@ export default function App() {
           <>
             {/* Background Overview Panel */}
             <div 
-              className="absolute top-[160px] lg:top-[100px] left-0 right-0 bottom-0 overflow-y-auto z-10 pb-[50dvh] hide-scrollbar transition-transform duration-75"
+              ref={overviewRef}
+              className="absolute top-[160px] lg:top-[100px] left-0 right-0 bottom-0 overflow-y-auto z-10 pb-24 hide-scrollbar transition-transform duration-75"
               style={{ 
                 opacity: 1 - scrollProgress * 0.7,
                 transform: `scale(${1 - scrollProgress * 0.1}) translateY(${scrollProgress * 20}px)`,
@@ -963,7 +1037,7 @@ export default function App() {
               <div className="h-[85dvh] pointer-events-none w-full" />
               
               {/* File List Container */}
-              <div className="sticky top-[160px] lg:top-[100px] z-40 px-4 sm:px-8 pb-24 h-[calc(100dvh-160px)] lg:h-[calc(100dvh-100px)] pointer-events-auto flex flex-col">
+              <div className="sticky top-[200px] lg:top-[140px] z-40 px-4 sm:px-8 pb-6 h-[calc(100dvh-200px)] lg:h-[calc(100dvh-140px)] pointer-events-auto flex flex-col">
                 <div className="solid-card rounded-3xl p-2 sm:p-6 flex flex-col text-slate-800 shadow-2xl border border-white/20 bg-white/95 backdrop-blur-xl h-full overflow-hidden">
                   {/* Drag Handle Indicator (Mobile) */}
                   <div className="w-full flex justify-center pt-2 pb-4 lg:hidden sticky top-0 z-10 bg-transparent">
@@ -1040,7 +1114,7 @@ export default function App() {
                             exit={{ opacity: 0, scale: 0.98 }}
                             transition={{ delay: Math.min(i * 0.02, 0.2), duration: 0.3 }}
                             onClick={() => handleRowClick(file)}
-                            className={`group grid grid-cols-[40px_1fr_80px_60px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center py-3 sm:py-4 cursor-pointer rounded-2xl px-2 transition-all hover:bg-slate-50 ${selectedFiles.has(file.id) ? 'bg-slate-50 shadow-sm border border-slate-100' : 'border border-transparent'}`}
+                            className={`group grid grid-cols-[40px_1fr_80px_60px] sm:grid-cols-[40px_40px_1fr_100px_80px_80px] gap-2 items-center py-2 sm:py-3 cursor-pointer rounded-2xl px-2 transition-all hover:bg-slate-50 ${selectedFiles.has(file.id) ? 'bg-slate-50 shadow-sm border border-slate-100' : 'border border-transparent'}`}
                           >
                             <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                               <input
@@ -1112,22 +1186,6 @@ export default function App() {
         )}
       </div>
       
-      {/* AI Chat Box - Fixed at bottom center */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-40">
-        <div className="glass-panel rounded-full p-2 flex items-center gap-2 shadow-2xl border border-white/20 bg-white/10 backdrop-blur-xl">
-          <button className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shrink-0">
-            <span className="text-cyan-300 text-lg">✨</span>
-          </button>
-          <input 
-            type="text" 
-            placeholder="Ask AI assistant to search, summarize, or analyze..." 
-            className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white/60 text-sm px-2"
-          />
-          <button className="px-4 py-2 rounded-full bg-white text-slate-900 text-sm font-medium hover:bg-slate-100 transition-colors shrink-0">
-            Send
-          </button>
-        </div>
-      </div>
 
       {/* Modals */}
       {/* Preview Modal */}
