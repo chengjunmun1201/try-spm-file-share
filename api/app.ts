@@ -935,8 +935,9 @@ app.post('/api/topup/upload', async (req, res) => {
     order.screenshot = imageBase64; // Save screenshot to database
 
     const invokeUrl = "https://integrate.api.nvidia.com/v1/chat/completions";
+    const apiKey = process.env.NVIDIA_API_KEY || "nvxxxxxRKDMoJ4";
     const headers = {
-      "Authorization": `Bearer ${process.env.NVIDIA_API_KEY || "nvxxxxxRKDMoJ4"}`,
+      "Authorization": apiKey.startsWith('Bearer ') ? apiKey : `Bearer ${apiKey}`,
       "Accept": "application/json"
     };
 
