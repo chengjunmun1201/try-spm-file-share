@@ -225,7 +225,7 @@ function AdminPanel() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      className="flex-1 flex flex-col w-full relative text-white"
+      className="flex-1 flex flex-col w-full max-w-7xl mx-auto relative text-white"
     >
       <AnimatePresence>
         {toast && (
@@ -259,23 +259,30 @@ function AdminPanel() {
           <>
             {/* Dashboard Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3 text-slate-800">
-                <div className="text-slate-400 flex items-center gap-2 text-sm"><Users size={16} /> Total Users</div>
-                <div className="font-display text-4xl font-semibold text-slate-800">{users.length}</div>
+              <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-1.5 flex flex-col shadow-xl">
+                <div className="bg-white/95 rounded-[1.5rem] p-6 flex flex-col gap-3 shadow-sm h-full">
+                  <div className="text-slate-500 flex items-center gap-2 text-sm font-medium"><Users size={16} /> Total Users</div>
+                  <div className="font-display text-4xl font-semibold text-slate-800">{users.length}</div>
+                </div>
               </div>
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3 text-slate-800">
-                <div className="text-slate-400 flex items-center gap-2 text-sm"><Plus size={16} /> Total Points</div>
-                <div className="font-display text-4xl font-semibold text-blue-600">{totalPoints}</div>
+              <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-1.5 flex flex-col shadow-xl">
+                <div className="bg-white/95 rounded-[1.5rem] p-6 flex flex-col gap-3 shadow-sm h-full">
+                  <div className="text-slate-500 flex items-center gap-2 text-sm font-medium"><Plus size={16} /> Total Points</div>
+                  <div className="font-display text-4xl font-semibold text-blue-600">{totalPoints}</div>
+                </div>
               </div>
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3 text-slate-800">
-                <div className="text-slate-400 flex items-center gap-2 text-sm"><Lock size={16} /> Locked Folders</div>
-                <div className="font-display text-4xl font-semibold text-amber-600">{folders.length}</div>
+              <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-1.5 flex flex-col shadow-xl">
+                <div className="bg-white/95 rounded-[1.5rem] p-6 flex flex-col gap-3 shadow-sm h-full">
+                  <div className="text-slate-500 flex items-center gap-2 text-sm font-medium"><Lock size={16} /> Locked Folders</div>
+                  <div className="font-display text-4xl font-semibold text-amber-600">{folders.length}</div>
+                </div>
               </div>
             </div>
 
             {/* Users Section */}
-            <section className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden text-slate-800">
-              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-1.5 shadow-xl">
+              <section className="bg-white/95 rounded-[1.5rem] overflow-hidden text-slate-800">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="font-display text-xl font-medium flex items-center gap-2"><Users size={20} className="text-blue-500" /> Users & Points</h3>
                 <div className="flex items-center gap-3">
                   <button onClick={bulkAddPoints} className="bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 transition-colors flex items-center gap-2">
@@ -331,11 +338,13 @@ function AdminPanel() {
                   {filteredUsers.length === 0 && <div className="p-10 text-center text-slate-400">No users found</div>}
                 </div>
               </div>
-            </section>
+              </section>
+            </div>
 
             {/* Folders Section */}
-            <section className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden text-slate-800">
-              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-white/10 backdrop-blur-3xl border border-white/20 rounded-[2rem] p-1.5 shadow-xl">
+              <section className="bg-white/95 rounded-[1.5rem] overflow-hidden text-slate-800">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h3 className="font-display text-xl font-medium flex items-center gap-2"><Lock size={20} className="text-amber-500" /> Locked Folders</h3>
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -390,7 +399,8 @@ function AdminPanel() {
                   {filteredFolders.length === 0 && <div className="p-10 text-center text-slate-400">No locked folders found</div>}
                 </div>
               </div>
-            </section>
+              </section>
+            </div>
           </>
         )}
       </div>
@@ -907,7 +917,7 @@ export default function App() {
         </header>
         
         {currentView === 'admin' ? (
-          <div className="glass-panel rounded-3xl p-6 flex-1 overflow-y-auto mx-4 sm:mx-8 mt-[140px] lg:mt-[100px] pointer-events-auto">
+          <div className="absolute top-[160px] lg:top-[100px] left-0 right-0 bottom-0 overflow-y-auto z-10 pb-24 px-4 sm:px-8 pointer-events-auto hide-scrollbar">
              <AdminPanel />
           </div>
         ) : (
